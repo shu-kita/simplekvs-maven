@@ -5,13 +5,13 @@ import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
 public class IOUtils {
     // KeyとValueをファイルに書き込む関数
     public static void dumpKV(BufferedOutputStream bos, String key, String value) throws IOException {
-    	System.out.println(key+" : "+value);
         // keyをbyte配列にエンコードし、長さを取得
         byte[][] KeyAndLen = IOUtils.getByteStrAndLength(key);
         byte[] byteKey = KeyAndLen[0];
@@ -125,5 +125,17 @@ public class IOUtils {
         System.arraycopy(byteArray2, 0, combinedArray, length1, length2);
 
         return combinedArray;
+    }
+    
+    // byte配列のスライス用関数
+    public static byte[] slice(byte[] arr, int stIndx, int enIndx) {
+        byte[] sclicedArr = Arrays.copyOfRange(arr, stIndx, enIndx);
+        return sclicedArr;
+    }
+    
+    // string配列のスライス用関数
+    public static String[] slice(String[] arr, int stIndx, int enIndx) {
+        String[] sclicedArr = Arrays.copyOfRange(arr, stIndx, enIndx);
+        return sclicedArr;
     }
 }

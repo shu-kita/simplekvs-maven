@@ -1,16 +1,17 @@
 package com.shu.simplekvs;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -151,65 +152,93 @@ public class SimpleKVS {
     	try (ServerSocket server = new ServerSocket(PORT)) {
     		System.out.println("start");
     		while(true) {
-        		Socket socket = server.accept();
-        		InputStreamReader isr = new InputStreamReader(socket.getInputStream());
-        		BufferedReader br = new BufferedReader(isr);
-        		String message = br.readLine();
-        		System.out.println("クライアントからのメッセージ＝" + message);
-        		
-        		/* messageを以下のようなMapにしたかったんだが、
-        		 * get, deleteメソッドにはvalueがないため、難しい
-        		 * {method : get, key: key1}
-        		 * {method : put, key: key1, value : value1}
-        		 * 
-        		 * 現状は配列として、インデックスの
-        		 * 	0がmethod
-        		 * 	1がkey
-        		 * 	2がvalue(methodがputの時のみ)
-        		 */
-        		String[] messageList = message.split(" ");
-        		
-        		String execRes = this.execOperation(messageList);
-        		
+    			Socket socket = server.accept();
+    			InputStream is = socket.getInputStream();
+    			byte [] buf = new byte[1024];
+    			is.read(buf);
+
+    			Map<String, String> req = this.getRequest(buf);
+    			String execRes = this.execOperation(req);
+
     			PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
-    			writer.println(execRes); 
+    			writer.println(execRes);
     		}
     	} catch (IOException e) {
     		e.printStackTrace();
     	}
     }
     
-    private String execOperation(String[] mList) {
-    	/* TODO:
-    	 * mListは長さが 2 or 3の配列
-    	 * →「put key "v v"」の指定をしたときに、配列のサイズは4になる
-    	 * 1や4以上の時の処理が書けていない
-    	 * (クライアント側のチェックは書いたので、後回しにしている)
-    	 */
-    	for (String s : mList) {
-    		System.out.println(s);
-    	}
-    	
-    	String method = mList[0];
-    	String key = mList[1];
-    	String value = mList.length == 3 ? mList[2] : null;
-    	System.out.println(method + " : " + key + " : " + value);
+    private Map<String, String> getRequest(byte[] buffer) {
+    	Map<String, String> request = new HashMap<>();
+ 
+    	byte[] byteCode = IOUtils.slice(buffer, 0, 4);
+		int methodCode = ByteBuffer.wrap(byteCode).getInt();
+		
+		String method = this.getMethod(methodCode);
+		request.put("method", method);
+		
+		switch(methodCode) {
+			case 0,2 -> {
+				// get, deleteの時
+				String key = this.getStrFromBytes(buffer, 4);
+				request.put("key", key);
+			}
+			case 1 -> {
+				// putの時の処理
+				String key = this.getStrFromBytes(buffer, 4);
+				request.put("key", key);
+				String value = this.getStrFromBytes(buffer, 8 + key.length()); // MethodCode, Key長のByte配列の長さの合計である4*2 = 8を足す 
+				request.put("value", value);
+			}
+			default -> {
+				System.out.println("Invalid method");
+				// TODO：変なメソッドが来た時の処理がない
+			}
+		}
+		return request;
+    }
 
-    	String result = switch(method) {
+    private String getStrFromBytes(byte[] bytes, int startIndex) {
+    	int endIndex = startIndex + 4; // Key、Value長を4byteの配列に変換しているため、+4としている
+    	
+    	byte[] lenBytes = IOUtils.slice(bytes, startIndex, endIndex);
+    	int length = ByteBuffer.wrap(lenBytes).getInt();
+    	
+    	startIndex += 4; // StartIndexに取得した4byte分足す
+    	endIndex = startIndex + length;
+    	
+    	byte[] strBytes = IOUtils.slice(bytes, startIndex, endIndex);
+    	return new String(strBytes);
+    }
+    
+    private String getMethod(int methodCode) {
+    	// methodCode(int)からmethod(String)に変換する
+    	String method = switch(methodCode) {
+	    	case 0 -> "get";
+	    	case 1 -> "put";
+	    	case 2 -> "delete";
+	    	default -> null;
+    	};
+    	return method;
+    }
+    
+    private String execOperation(Map<String, String> request) {
+
+    	String result = switch(request.get("method")) {
     					case "get":
-    						yield this.get(key);
+    						yield this.get(request.get("key"));
 			    		case "put":
-			    			this.put(key,value);
+			    			this.put(request.get("key"),request.get("value"));
 			    			yield "success put";
 			    		case "delete":
-			    			this.delete(key);
+			    			this.delete(request.get("key"));
 			    			yield "success delete";
 			    		default:
 			    			yield "Invalid method";
     					};
     	return result;
     }
-
+    
     public static void main(String[] args) {
     	SimpleKVS kvs = new SimpleKVS("test");
     	kvs.run();
