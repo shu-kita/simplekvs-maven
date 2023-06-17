@@ -240,7 +240,14 @@ public class SimpleKVS {
     }
     
     public static void main(String[] args) {
-    	SimpleKVS kvs = new SimpleKVS("test");
+    	if (args.length > 1) {
+    		System.out.println("Invalid argments.");
+    		System.exit(1);
+    	}
+
+    	String dataDir = args.length == 1 ? args[0] : "data"; // dataを保存するディレクトリ(デフォルトはdata)
+    	System.out.println("data directory : " + dataDir);
+    	SimpleKVS kvs = new SimpleKVS(dataDir);
     	kvs.run();
     }
 }
