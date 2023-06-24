@@ -17,6 +17,8 @@ import java.util.Map;
 import java.util.TreeMap;
 
 public class SimpleKVS {
+	private static final int PORT = 10000;
+	
     private Path dataDir;
     private Map<String, String> memtable;
     private int memtableLimit;
@@ -147,9 +149,8 @@ public class SimpleKVS {
     }
     
     private void run() {
-    	final int PORT = 10000;
 
-    	try (ServerSocket server = new ServerSocket(PORT)) {
+    	try (ServerSocket server = new ServerSocket(SimpleKVS.PORT)) {
     		System.out.println("start");
     		while(true) {
     			Socket socket = server.accept();
@@ -171,29 +172,36 @@ public class SimpleKVS {
     private Map<String, String> getRequest(byte[] buffer) {
     	Map<String, String> request = new HashMap<>();
  
-    	byte[] byteCode = IOUtils.slice(buffer, 0, 4);
+    	byte[] byteCode = ArrayUtil.slice(buffer, 0, 4);
 		int methodCode = ByteBuffer.wrap(byteCode).getInt();
 		
 		String method = this.getMethod(methodCode);
 		request.put("method", method);
 		
+		String key;
+		String value;
 		switch(methodCode) {
-			case 0,2 -> {
-				// get, deleteの時
-				String key = this.getStrFromBytes(buffer, 4);
+			case 0:
+				// getの時
+				key = this.getStrFromBytes(buffer, 4);
 				request.put("key", key);
-			}
-			case 1 -> {
+				break;
+			case 1:
 				// putの時の処理
-				String key = this.getStrFromBytes(buffer, 4);
+				key = this.getStrFromBytes(buffer, 4);
 				request.put("key", key);
-				String value = this.getStrFromBytes(buffer, 8 + key.length()); // MethodCode, Key長のByte配列の長さの合計である4*2 = 8を足す 
+				value = this.getStrFromBytes(buffer, 8 + key.length()); // MethodCode, Key長のByte配列の長さの合計である4*2 = 8を足す 
 				request.put("value", value);
-			}
-			default -> {
+				break;
+			case 2:
+				// deleteの時
+				key = this.getStrFromBytes(buffer, 4);
+				request.put("key", key);
+				break;
+			default:
 				System.out.println("Invalid method");
+				break;
 				// TODO：変なメソッドが来た時の処理がない
-			}
 		}
 		return request;
     }
@@ -201,41 +209,55 @@ public class SimpleKVS {
     private String getStrFromBytes(byte[] bytes, int startIndex) {
     	int endIndex = startIndex + 4; // Key、Value長を4byteの配列に変換しているため、+4としている
     	
-    	byte[] lenBytes = IOUtils.slice(bytes, startIndex, endIndex);
+    	byte[] lenBytes = ArrayUtil.slice(bytes, startIndex, endIndex);
     	int length = ByteBuffer.wrap(lenBytes).getInt();
     	
     	startIndex += 4; // StartIndexに取得した4byte分足す
     	endIndex = startIndex + length;
     	
-    	byte[] strBytes = IOUtils.slice(bytes, startIndex, endIndex);
+    	byte[] strBytes = ArrayUtil.slice(bytes, startIndex, endIndex);
     	return new String(strBytes);
     }
     
     private String getMethod(int methodCode) {
     	// methodCode(int)からmethod(String)に変換する
-    	String method = switch(methodCode) {
-	    	case 0 -> "get";
-	    	case 1 -> "put";
-	    	case 2 -> "delete";
-	    	default -> null;
-    	};
+    	String method;
+    	switch (methodCode) {
+    	case 0:
+    		method = "get";
+    		break;
+    	case 1:
+    		method = "put";
+    		break;
+    	case 2:
+    		method = "delete";
+    		break;
+    	default:
+    		method = null;
+    		break;
+    	}
     	return method;
     }
     
     private String execOperation(Map<String, String> request) {
 
-    	String result = switch(request.get("method")) {
-    					case "get":
-    						yield this.get(request.get("key"));
-			    		case "put":
-			    			this.put(request.get("key"),request.get("value"));
-			    			yield "success put";
-			    		case "delete":
-			    			this.delete(request.get("key"));
-			    			yield "success delete";
-			    		default:
-			    			yield "Invalid method";
-    					};
+    	String result;
+    	switch(request.get("method")) {
+    		case "get":
+    			result = this.get(request.get("key"));
+    			break;
+			case "put":
+			    this.put(request.get("key"),request.get("value"));
+			    result = "success put";
+			    break;
+			case "delete":
+				this.delete(request.get("key"));
+				result = "success delete";
+				break;
+			default:
+			    result =  "Invalid method";
+			    break;
+    	};
     	return result;
     }
     

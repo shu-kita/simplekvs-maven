@@ -6,32 +6,19 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 
 public class skvs {
-	private static final String help = """
-			get, deleteの時
-			    java skvs <get or delete> <key>
-			putの時
-			    java skvs put <key> <value>
-			""";
+	private static final String help = "get, deleteの時\n\tjava skvs <get or delete> <key>\nputの時\n\tjava skvs put <key> <value>";
 	
 	public static void main(String[] args) {
 		if (!skvs.checkArgs(args)) {
-			System.out.println(String.format("""
-					[ERROR] 引数が間違っています
-					Usage :					
-					%s
-					""", skvs.help));
+			System.out.println(String.format("\n[ERROR] 引数が間違っています\nUsage :\n%s", skvs.help));
 			return;
 		}
 		
 		byte[][] byteArgs = skvs.convArgsToBytes(args);
 		
-		byte[] bytes = byteArgs[0];
-		for(int i = 1; i < byteArgs.length; i++) {
-			bytes = IOUtils.combineBytes(bytes, byteArgs[i]);
-		}
+		byte[] bytes = ArrayUtil.combineArray(byteArgs);
 
 		// クライアントソケットを生成
 		try (Socket socket = new Socket("localhost", 10000);
@@ -51,10 +38,20 @@ public class skvs {
 			return false;
 		}
 		
-		boolean result = switch (args[0]) {
-		case "get", "delete" -> args.length == 2 ? true : false;
-		case "put" -> args.length == 3 ? true : false;
-		default -> false;
+		boolean result;
+		switch (args[0]) {
+		case "get":
+			result = args.length == 2 ? true : false;
+			break;
+		case "delete":
+			result = args.length == 2 ? true : false;
+			break;
+		case "put":
+			result = args.length == 3 ? true : false;
+			break;
+		default:
+			result = false;
+			break;
 		};
 		return result;
 	}
@@ -66,7 +63,7 @@ public class skvs {
 		int index = 0;
 		byteArgs[index] = ByteBuffer.allocate(4).putInt(methodCode).array();
 
-		for (String strKV : IOUtils.slice(args, 1, args.length)) {
+		for (String strKV : ArrayUtil.slice(args, 1, args.length)) {
 			byte[][] bytes = IOUtils.getByteStrAndLength(strKV);
 	        byte[] byteStr = bytes[0];
 	        byte[] byteLenStr = bytes[1];
@@ -77,17 +74,20 @@ public class skvs {
 	}
 	
 	private static int getMethodCode(String method) {
-		int methodCode = switch(method) {
-			case "get" -> 0;
-			case "put" -> 1;
-			case "delete" -> 2;
-			default -> 99;
+		int methodCode;
+		switch(method) {
+			case "get":
+				methodCode = 0;
+				break;
+			case "put":
+				methodCode = 1;
+				break;
+			case "delete":
+				methodCode = 2;
+				break;
+			default:
+				methodCode = 99;
 		};
 		return methodCode;
 	}
-	
-	public static byte[] slice(byte[] arr, int stIndx, int enIndx) {
-        byte[] sclicedArr = Arrays.copyOfRange(arr, stIndx, enIndx);
-        return sclicedArr;
-    }
 }
