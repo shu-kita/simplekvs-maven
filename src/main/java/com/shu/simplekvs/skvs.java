@@ -8,11 +8,11 @@ import java.net.Socket;
 import java.nio.ByteBuffer;
 
 public class skvs {
-	private static final String help = "get, deleteの時\n\tjava skvs <get or delete> <key>\nputの時\n\tjava skvs put <key> <value>";
+	private static final String HELP = "get, deleteの時\n\tjava skvs <get or delete> <key>\nputの時\n\tjava skvs put <key> <value>";
 	
 	public static void main(String[] args) {
 		if (!skvs.checkArgs(args)) {
-			System.out.println(String.format("\n[ERROR] 引数が間違っています\nUsage :\n%s", skvs.help));
+			System.out.println(String.format("\n[ERROR] 引数が間違っています\nUsage :\n%s", skvs.HELP));
 			return;
 		}
 		

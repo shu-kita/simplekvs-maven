@@ -17,8 +17,8 @@ import java.util.Map;
 import java.util.TreeMap;
 
 public class SimpleKVS {
-	private static final int PORT = 10000;
-	
+    private static final int PORT = 10000;
+
     private Path dataDir;
     private Map<String, String> memtable;
     private int memtableLimit;
