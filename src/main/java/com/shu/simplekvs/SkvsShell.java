@@ -6,16 +6,16 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class SkvsShell {
 	private static final String HELP = "get, deleteの時\n\tget(or delete) \"<key>\"\nputの時\n\tput \"<key>\" \"<value>\"";
 	private static final String EXIT = "exit";
 	
 	public static void main(String[] args) {
-		// TODO
-		//「get "key1"」と「get "key1" 」で動作が違う(末尾に半角スペースがある/ない)
-		// 原因不明
-		
 		try(
 			InputStreamReader isr = new InputStreamReader(System.in);
 			BufferedReader br = new BufferedReader(isr);
@@ -30,6 +30,7 @@ public class SkvsShell {
 				}
 				
 				String[] inputList = SkvsShell.parseInput(input);
+				
 				if (!SkvsShell.checkInput(inputList)) {
 					System.out.println(String.format("\n[ERROR] 入力が間違っています\nUsage :\n%s", SkvsShell.HELP));
 					continue;
@@ -44,7 +45,7 @@ public class SkvsShell {
 		}
 	}
 	
-	private static boolean checkInput(String inputs[]) {
+	private static boolean checkInput(String[] inputs) {
 		if (inputs.length == 0) {
 			return false;
 		}
@@ -76,10 +77,8 @@ public class SkvsShell {
 
 		for (String strKV : ArrayUtil.slice(args, 1, args.length)) {
 			byte[][] bytes = IOUtils.getByteStrAndLength(strKV);
-	        byte[] byteStr = bytes[0];
-	        byte[] byteLenStr = bytes[1];
-			byteArgs[++index] = byteLenStr;
-			byteArgs[++index] = byteStr;
+			byteArgs[++index] = bytes[1]; //文字列の長さ
+			byteArgs[++index] = bytes[0]; //文字列
 		}
 		return byteArgs;
 	}
@@ -102,12 +101,23 @@ public class SkvsShell {
 		return methodCode;
 	}
 	
-	private static String[] parseInput(String input) {
-		String[] parsed = input.split(" \"");
-		for (int i=0; i < parsed.length; i++) {
-			parsed[i] = parsed[i].replace("\"", "");
+	private static String[] parseInput(String input) {		
+		List<String> inputs = new ArrayList<>();
+		
+		// メソッド取得用
+		Pattern p1 = Pattern.compile("^.+? ");
+		Matcher m1 = p1.matcher(input);
+		String method = m1.find() ? m1.group() : null;
+
+		inputs.add(method.substring(0, method.length()-1));
+		
+		Pattern p2 = Pattern.compile("\".*?\"");
+		Matcher m2 = p2.matcher(input);
+		while (m2.find()) {
+			inputs.add(m2.group().replace("\"", ""));
 		}
-		return parsed;
+		
+		return inputs.toArray(new String[inputs.size()]);
 	}
 	
 	private static void sendData(byte[] bytes) throws IOException{
