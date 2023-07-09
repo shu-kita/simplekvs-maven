@@ -21,8 +21,8 @@ jarファイルが存在するディレクトリで実行することを想定�
 
 ## ファイル構成
 
-memtableの要素数が1024を超えたら、SSTableにflashされる。
-flash時にindexファイルも作成される。
+memtableの要素数が1024を超えたら、SSTableにflashされる。(既定値の場合)
+flash時にindexファイルが作成される。
 ```
 data_dir
     ├─sstab_<unixtime>.dat # SSTable
@@ -31,7 +31,13 @@ data_dir
 ```
 
 ## TODO
-* ログ出力の処理ない
+
+* ログ出力の処理がない
+* コンパクションの処理がない
+
+## 改善案
+
+* memtableの最大サイズ・データを置くディレクトリなどを設定ファイルに書くようにする
 
 ## ライセンス
 
