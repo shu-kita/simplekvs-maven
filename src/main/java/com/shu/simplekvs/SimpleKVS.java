@@ -15,9 +15,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.logging.FileHandler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
 
 public class SimpleKVS {
     private static final int PORT = 10000;
+    private Logger logger = Logger.getLogger("SampleLogging");
 
     private Path dataDir;
     private Map<String, String> memtable;
@@ -26,6 +31,19 @@ public class SimpleKVS {
     private WAL wal;
 
     public SimpleKVS(String dataDir, int memtableLimit) {
+    	try {
+    		// 出力ファイルを指定
+    		FileHandler fh = new FileHandler("test.log");
+    		// フォーマット指定
+    		fh.setFormatter(new SimpleFormatter());
+    		// 何をしてる処理かわかっていない（ロガーにファイルを指定している？）
+    		this.logger.addHandler(fh);
+    	} catch (IOException e) {
+    		e.printStackTrace();
+    	}
+    	
+    	this.logger.log(Level.INFO, "Start init.");
+    	
         this.dataDir = Paths.get(dataDir);
         
         // ディレクトリが存在しない場合、作成する
