@@ -33,7 +33,7 @@ public class SimpleKVS {
     public SimpleKVS(String dataDir, int memtableLimit) {
     	try {
     		// 出力ファイルを指定
-    		FileHandler fh = new FileHandler("test.log");
+    		FileHandler fh = new FileHandler("test.log", true);
     		// フォーマット指定
     		fh.setFormatter(new SimpleFormatter());
     		// 何をしてる処理かわかっていない（ロガーにファイルを指定している？）
@@ -42,36 +42,41 @@ public class SimpleKVS {
     		e.printStackTrace();
     	}
     	
-    	this.logger.log(Level.INFO, "Start init.");
+    	this.logger.log(Level.INFO, "Launch SimpleKVS.");
     	
+
         this.dataDir = Paths.get(dataDir);
+    	this.logger.log(Level.INFO, String.format("Set \"%s\" as the data directory.", this.dataDir));
         
         // ディレクトリが存在しない場合、作成する
         if (!Files.exists(this.dataDir)) {
+        	this.logger.log(Level.INFO, String.format("\"%s\" isn't exist, so create a directory.", this.dataDir));
         	try {
         		Files.createDirectories(this.dataDir);
         	} catch (IOException e) {
-        		e.printStackTrace();
+        		this.logger.log(Level.WARNING, "The following exception occurred in the process of creating directory.", e);
         	}
         }
         
         this.memtable = new TreeMap<String, String>();
         this.memtableLimit = memtableLimit;
+        this.logger.log(Level.INFO, String.format("Set \"%d\" as number of the limit of memtable.", this.memtableLimit));
         
         // SSTable読み込み処理
         this.sstableList = new ArrayList<SSTable>();
         this.loadSSTables(dataDir);
-
+        
         // WAL読込み処理
+        this.logger.log(Level.INFO, String.format("Load WAL."));
         this.wal = new WAL(dataDir);
         try {
         	this.memtable = this.wal.recovery();
         } catch (IOException e) {
-        	// TODO
-        	//   * 強制終了させる処理
-        	//   * log出力処理
-        	e.printStackTrace();
+        	this.logger.log(Level.WARNING, "The following exception occurred in the process loading WAL.", e);
         }
+        this.logger.log(Level.INFO, String.format("Loading WAL is complete."));
+        
+        this.logger.log(Level.INFO, "Finish to launch SimpleKVS");
     }
 
     public SimpleKVS(String dataDir) {
@@ -83,12 +88,8 @@ public class SimpleKVS {
     }
     
     public String get(String key) {
-    	/*
-    	 * keyがmemtable, SSTableのどちらにも存在しない場合、
-    	 * valueには空文字列が入るようになっている。
-    	 * とりあえず動作はするため、この処理にしている。
-    	 */
     	String value;
+    	this.logger.log(Level.INFO, String.format("Operation is get. Key is \"%s\"", key));
     	if (this.memtable.containsKey(key)) {
             value = this.memtable.get(key);
         } else {
@@ -99,21 +100,28 @@ public class SimpleKVS {
     }
 
     public void put(String key, String value) {
+    	this.logger.log(Level.INFO, String.format("Operation is put. Key is \"%s\", Value is \"%s\"", key, value));
+
     	this.writeWAL(key, value);
-        this.memtable.put(key, value);
+    	
+    	this.memtable.put(key, value);
+    	this.logger.log(Level.INFO, String.format("Key \"%s\" and Value \"%s\" are written to Memtable.", key, value));
+
         if (this.memtable.size() >= this.memtableLimit) {
         	// flush処理
+        	this.logger.log(Level.INFO, "Number of rows in memtable have reached the limit, so flush memtable to SSTable");
         	try {
         		SSTable sstable = new SSTable(this.dataDir.toString() , this.memtable);
         		this.sstableList.add(sstable);
                 this.memtable = new TreeMap<String, String>();
         	} catch (IOException e){
-        		e.printStackTrace();
+        		this.logger.log(Level.WARNING, "The following exception occurred in the process flush memtable to SSTable.", e);
         	}
         }
     }
 
     public void delete(String key) {
+    	this.logger.log(Level.INFO, String.format("Operation is delete. Key is \"%s\"", key));
         this.writeWAL(key, "__tombstone__");
         this.memtable.put(key, "__tombstone__");
     }
@@ -127,27 +135,30 @@ public class SimpleKVS {
     
     private void writeWAL(String key, String value) {
     	try {
-    		System.out.println(key + " : " + value);
     		this.wal.put(key, value);
+        	this.logger.log(Level.INFO, String.format("Key \"%s\" and Value \"%s\" are written to WAL.", key, value));
     	} catch (IOException e) {
-    		e.printStackTrace();
+    		this.logger.log(Level.WARNING, "The following exception occurred in the process writing to WAL.", e);
     	}
     }
     
     private void loadSSTables(String dataDir) {
+    	this.logger.log(Level.INFO, "Load SSTables.");
     	//ロードしたSSTableは時系列の古い順でリストに格納される
         File[] files = new File(dataDir).listFiles();
         for (File file : files) {
         	String path = file.getPath();
         	if (path.startsWith("sstab") && path.endsWith(".dat")) {
+        		this.logger.log(Level.INFO, String.format("Load SSTable \"%s\"", path));
         		try {
         			this.sstableList.add(new SSTable(path));
         		} catch (IOException e) {
-        			// TODO : SSTableが読み込めなかった時の処理
-        			e.printStackTrace();
+        			this.logger.log(Level.WARNING, String.format("The following exception occurred in the process loading SSTable \"%s\".", path), e);
         		}
+        		this.logger.log(Level.INFO, String.format("Loading SSTable \"%s\" is complete.", path));
         	}
         }
+        this.logger.log(Level.INFO, "Loading SSTables is complete.");
     }
     
     private String getFromSSTable(String key) {
@@ -161,15 +172,16 @@ public class SimpleKVS {
             	}
         	}
     	} catch (IOException e) {
-    		e.printStackTrace();
+    		this.logger.log(Level.WARNING, "The following exception occurred in the process getting value in SSTable.", e);
     	}
     	return value;
     }
     
+    
+    // TODO
+    // ここより下（Socket Server機能 + リクエストを処理している部分）のログ機能
     private void run() {
-
     	try (ServerSocket server = new ServerSocket(SimpleKVS.PORT)) {
-    		System.out.println("start");
     		while(true) {
     			Socket socket = server.accept();
     			InputStream is = socket.getInputStream();
@@ -286,7 +298,6 @@ public class SimpleKVS {
     	}
 
     	String dataDir = args.length == 1 ? args[0] : "data"; // dataを保存するディレクトリ(デフォルトはdata)
-    	System.out.println("data directory : " + dataDir);
     	SimpleKVS kvs = new SimpleKVS(dataDir);
     	kvs.run();
     }

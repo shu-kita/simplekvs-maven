@@ -15,8 +15,13 @@ jarファイルが存在するディレクトリで実行することを想定�
   # java -cp simplekvs-maven-0.0.1-SNAPSHOT.jar com.shu.simplekvs.SimpleKVS
   ```
 * クライアント
+  SkvsShellを実行すると、対話的に実行できる。  
+  get/put/deleteの実行は以下のように行う。
   ```
-  # java -cp simplekvs-maven-0.0.1-SNAPSHOT.jar com.shu.simplekvs.skvs <method> <key> <value>
+  # java -cp simplekvs-maven-0.0.1-SNAPSHOT.jar com.shu.simplekvs.SkvsShell
+  > get "<key>"
+  > put "<key>", "<value>"
+  > delete "<key>"
   ```
 
 ## ファイル構成
@@ -32,7 +37,9 @@ data_dir
 
 ## TODO
 
-* ログ出力の処理がない
+* Socket Serverとリクエストを受け付ける箇所のログ出力の処理がない
+* ログファイルが"test.log"というファイルで固定になっている。  
+  また、プログラムを実行したディレクトリの直下に作成されるようになっている
 * コンパクションの処理がない
 
 ## 改善案
