@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +23,7 @@ import java.util.logging.SimpleFormatter;
 
 public class SimpleKVS {
     private static final int PORT = 10000;
+    private static final List<String> METHODLIST = new ArrayList<>(Arrays.asList("put","get","delete")); 
     private Logger logger = Logger.getLogger("SampleLogging");
 
     private Path dataDir;
@@ -178,24 +180,32 @@ public class SimpleKVS {
     }
     
     
-    // TODO
-    // ここより下（Socket Server機能 + リクエストを処理している部分）のログ機能
     private void run() {
     	try (ServerSocket server = new ServerSocket(SimpleKVS.PORT)) {
+    		this.logger.log(Level.INFO, String.format("Listening for incoming connections on port %d.", SimpleKVS.PORT));
     		while(true) {
     			Socket socket = server.accept();
     			InputStream is = socket.getInputStream();
+    			this.logger.log(Level.INFO, String.format("New connection established from %s.", socket.getRemoteSocketAddress()));
+
     			byte [] buf = new byte[1024];
     			is.read(buf);
 
     			Map<String, String> req = this.getRequest(buf);
-    			String execRes = this.execOperation(req);
 
     			PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
+    			if (!SimpleKVS.METHODLIST.contains(req.get("method"))){
+    				writer.println("invalid method");
+    				continue;
+    			}
+    			
+    			String execRes = this.execOperation(req);
+    			System.out.println("exec");
+    			
     			writer.println(execRes);
     		}
     	} catch (IOException e) {
-    		e.printStackTrace();
+    		this.logger.log(Level.WARNING, "The following exception occurred in the process incoming connection.", e);
     	}
     }
     
@@ -229,9 +239,8 @@ public class SimpleKVS {
 				request.put("key", key);
 				break;
 			default:
-				System.out.println("Invalid method");
+				this.logger.log(Level.WARNING, String.format("Method \"%s\"is invalid.", method));
 				break;
-				// TODO：変なメソッドが来た時の処理がない
 		}
 		return request;
     }
@@ -270,18 +279,20 @@ public class SimpleKVS {
     }
     
     private String execOperation(Map<String, String> request) {
-
     	String result;
+    	String key;
+    	key = request.get("key");
     	switch(request.get("method")) {
     		case "get":
-    			result = this.get(request.get("key"));
+    			result = this.get(key);
     			break;
 			case "put":
-			    this.put(request.get("key"),request.get("value"));
-			    result = "success put";
+				String value = request.get("value");
+			    this.put(key, value);
+			    result = "success put"; // TODO : 失敗時の処理や返却内容の検討
 			    break;
 			case "delete":
-				this.delete(request.get("key"));
+				this.delete(key);
 				result = "success delete";
 				break;
 			default:
