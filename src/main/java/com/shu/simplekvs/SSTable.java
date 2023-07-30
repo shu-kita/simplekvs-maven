@@ -13,9 +13,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 public class SSTable {
     private Path path;
+    private Path indexPath;
     private Map<String, Integer> index;
 
     public SSTable(String path, Map<String, String> memtable) throws IOException{
@@ -43,7 +45,7 @@ public class SSTable {
 
         this.index = new HashMap<>();
         this.dumpKV(memtable);
-        this.dumpIndex(this.index);
+        this.indexPath = this.dumpIndex(this.index);
     }
 
     public SSTable(String path) throws FileNotFoundException, IOException{
@@ -53,8 +55,12 @@ public class SSTable {
             throw new FileNotFoundException(String.format("%s is not found.", path));
         }
 
-        String indexPath = path + ".index";
-        this.index = loadIndex(indexPath);
+        this.indexPath = Paths.get(path + ".index");
+        this.index = loadIndex(this.indexPath.toString());
+    }
+    
+    public SSTable(Path path) throws IOException{
+    	this(path.toString());
     }
 
     protected String get(String key) throws IOException{
@@ -67,6 +73,7 @@ public class SSTable {
     		String[] kv = IOUtils.loadKV(bis, position);
     		value = kv[1];
     	}
+    	System.out.println(value);
     	return value;
     }
     
@@ -74,6 +81,18 @@ public class SSTable {
     	return this.index.containsKey(key);
     }
     
+    protected Set<String> getKeySet(){
+    	return this.index.keySet();
+    }
+    
+    protected String getPath() {
+    	return this.path.toString();
+    }
+    
+    protected void delete() throws IOException{
+    	Files.delete(this.indexPath);
+    	Files.delete(this.path);
+    }
     /*
      * 以下、privateメソッド
      */
@@ -88,13 +107,13 @@ public class SSTable {
                     String key = kv.getKey();
                     String value = kv.getValue();
                     this.index.put(key, position);
-                    position = key.length() + value.length() + 8;
+                    position += key.length() + value.length() + 8;
                     IOUtils.dumpKV(bos, key, value);
                 }
             }
     }
     
-    private void dumpIndex(Map<String, Integer> index)  throws IOException{
+    private Path dumpIndex(Map<String, Integer> index)  throws IOException{
     	String path = this.path.toString() + ".index";
     	try (
             FileOutputStream fos = new FileOutputStream(path);
@@ -106,6 +125,7 @@ public class SSTable {
     			IOUtils.dumpIndex(bos, key, position);
     		}
     	}
+    	return Paths.get(path);
     }
     
     private Map<String, Integer> loadIndex(String path) throws IOException{

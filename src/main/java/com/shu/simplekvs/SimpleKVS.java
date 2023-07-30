@@ -68,6 +68,9 @@ public class SimpleKVS {
         this.sstableList = new ArrayList<SSTable>();
         this.loadSSTables(dataDir);
         
+        // Compaction
+        this.majorCompaction(this.sstableList);
+        
         // WAL読込み処理
         this.logger.log(Level.INFO, String.format("Load WAL."));
         this.wal = new WAL(dataDir);
@@ -110,15 +113,17 @@ public class SimpleKVS {
     	this.logger.log(Level.INFO, String.format("Key \"%s\" and Value \"%s\" are written to Memtable.", key, value));
 
         if (this.memtable.size() >= this.memtableLimit) {
-        	// flush処理
+        	// Memtableのサイズが上限を超えた処理
         	this.logger.log(Level.INFO, "Number of rows in memtable have reached the limit, so flush memtable to SSTable");
-        	try {
-        		SSTable sstable = new SSTable(this.dataDir.toString() , this.memtable);
-        		this.sstableList.add(sstable);
-                this.memtable = new TreeMap<String, String>();
-        	} catch (IOException e){
-        		this.logger.log(Level.WARNING, "The following exception occurred in the process flush memtable to SSTable.", e);
-        	}
+        	SSTable sstable = this.flush(this.dataDir.toString(), this.memtable);
+        	this.sstableList.add(sstable);
+            this.memtable = new TreeMap<String, String>();
+            try{
+            	this.logger.log(Level.INFO, "Clean up WAL.");
+            	this.wal.cleanUp();
+            } catch (IOException e){
+            	this.logger.log(Level.WARNING, "The following exception occurred in the process to clean up WAL.", e);
+            }
         }
     }
 
@@ -148,9 +153,11 @@ public class SimpleKVS {
     	this.logger.log(Level.INFO, "Load SSTables.");
     	//ロードしたSSTableは時系列の古い順でリストに格納される
         File[] files = new File(dataDir).listFiles();
+        
         for (File file : files) {
-        	String path = file.getPath();
-        	if (path.startsWith("sstab") && path.endsWith(".dat")) {
+        	Path path = file.toPath();
+        	String fileName = path.getFileName().toString();
+        	if (fileName.startsWith("sstab") && fileName.endsWith(".dat")) {
         		this.logger.log(Level.INFO, String.format("Load SSTable \"%s\"", path));
         		try {
         			this.sstableList.add(new SSTable(path));
@@ -166,12 +173,13 @@ public class SimpleKVS {
     private String getFromSSTable(String key) {
     	String value = "";
     	try {
-    		//ロード時点で時系列順で入るので、ソートはしていない
-    		for (SSTable sstable : this.sstableList) {
-            	if (sstable.containsKey(key)) {
+    		// SSTableのリストには古い順で格納されるので、逆順でループする
+    		for (int i=(this.sstableList.size()-1); i>=0; i--) {
+    			SSTable sstable = this.sstableList.get(i);
+    			if (sstable.containsKey(key)) {
             		value = sstable.get(key);
             		break;
-            	}
+    			}
         	}
     	} catch (IOException e) {
     		this.logger.log(Level.WARNING, "The following exception occurred in the process getting value in SSTable.", e);
@@ -179,6 +187,66 @@ public class SimpleKVS {
     	return value;
     }
     
+    private SSTable flush(String path, Map<String, String> memtable) {
+    	SSTable sstable = null;
+    	try {
+    		sstable = new SSTable(path, memtable);
+    	} catch (IOException e) {
+    		this.logger.log(Level.WARNING, "The following exception occurred in the process flush memtable to SSTable.", e);
+    	}
+    	return sstable;
+    }
+    
+    private void majorCompaction(List<SSTable> sstableList) {
+    	this.logger.log(Level.INFO, "Major compaction start.");
+    	
+    	// SSTableの数が２以下の場合、処理せず終了する
+    	if (sstableList.size() <= 2) {
+    		this.logger.log(Level.WARNING, "Compaction isn't execute because the number of SSTables was less than two.");
+    		return;
+    	}
+    	
+    	Map<String, String> mergedMemtable = this.mergeSSTables(sstableList);
+    	
+    	SSTable newSSTable = this.flush(this.dataDir.toString(), mergedMemtable);
+    	
+    	this.deleteSSTable(this.sstableList);
+    	this.sstableList.clear();
+    	this.sstableList.add(newSSTable);
+    	this.logger.log(Level.INFO, "Major compaction finish.");
+    }
+    
+    private Map<String, String> mergeSSTables(List<SSTable> sstableList) {
+    	this.logger.log(Level.INFO, "Merge exists SSTables.");
+    	Map<String, String> mergedMemtable = new TreeMap<String, String>();
+
+    	for (SSTable sstab : sstableList) {
+    		System.out.println(sstab.getPath());
+    		for (String key : sstab.getKeySet()) {
+    			try {
+    				String value = sstab.get(key);
+    				if (this.isDeleted(value)) {
+    					mergedMemtable.remove(key);
+    					continue;
+    				}
+    				mergedMemtable.put(key, value);
+    			} catch (IOException e) {
+    				this.logger.log(Level.WARNING, "The following exception occurred in the process getting value in SSTable.", e);
+    			}
+    		}
+    	}
+    	return mergedMemtable;
+    }
+    private void deleteSSTable(List<SSTable> sstableList) {
+    	this.logger.log(Level.INFO, "Delete merged SSTables");
+    	for (SSTable sstable : sstableList) {
+    		try {
+    			sstable.delete();
+    		} catch (IOException e) {
+    			this.logger.log(Level.WARNING, "The following exception occurred in the process deleting SSTables.", e);
+    		}
+    	}
+    }
     
     private void run() {
     	try (ServerSocket server = new ServerSocket(SimpleKVS.PORT)) {
@@ -309,7 +377,7 @@ public class SimpleKVS {
     	}
 
     	String dataDir = args.length == 1 ? args[0] : "data"; // dataを保存するディレクトリ(デフォルトはdata)
-    	SimpleKVS kvs = new SimpleKVS(dataDir);
+    	SimpleKVS kvs = new SimpleKVS(dataDir, 10);
     	kvs.run();
     }
 }
