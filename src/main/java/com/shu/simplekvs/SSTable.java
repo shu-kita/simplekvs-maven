@@ -73,7 +73,6 @@ public class SSTable {
     		String[] kv = IOUtils.loadKV(bis, position);
     		value = kv[1];
     	}
-    	System.out.println(value);
     	return value;
     }
     
@@ -107,6 +106,8 @@ public class SSTable {
                     String key = kv.getKey();
                     String value = kv.getValue();
                     this.index.put(key, position);
+                    // key, valueの長さ + 8(それぞれの長さを4バイトで表すための4*2) をpositionに加える
+                    // ＝次のpositionを求める
                     position += key.length() + value.length() + 8;
                     IOUtils.dumpKV(bos, key, value);
                 }
