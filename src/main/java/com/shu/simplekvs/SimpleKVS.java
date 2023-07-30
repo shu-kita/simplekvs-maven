@@ -377,7 +377,7 @@ public class SimpleKVS {
     	}
 
     	String dataDir = args.length == 1 ? args[0] : "data"; // dataを保存するディレクトリ(デフォルトはdata)
-    	SimpleKVS kvs = new SimpleKVS(dataDir, 10);
+    	SimpleKVS kvs = new SimpleKVS(dataDir);
     	kvs.run();
     }
 }
