@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 public class WAL {
-	private static final String FILENAME = "wal.dat";
+    private static final String FILENAME = "wal.dat";
     private String path;
 
     public WAL(String dataDir) {
