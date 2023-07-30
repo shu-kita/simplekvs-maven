@@ -23,19 +23,34 @@ import java.util.logging.SimpleFormatter;
 
 public class SimpleKVS {
     private static final int PORT = 10000;
+    private static final int MEMTABLE_LIMIT_DEFAULT = 1024;
+    private static final String LOGDIR_DEFAULT = "log";
+    private static final String LOGFILE_NAME = "SimpleKVS.log";
+    private static final String DATADIR_DEFAULT = "data";
     private static final List<String> METHODLIST = new ArrayList<>(Arrays.asList("put","get","delete")); 
     private Logger logger = Logger.getLogger("SampleLogging");
 
     private Path dataDir;
+    private Path logDir;
     private Map<String, String> memtable;
     private int memtableLimit;
     private List<SSTable> sstableList;
     private WAL wal;
 
-    public SimpleKVS(String dataDir, int memtableLimit) {
+    public SimpleKVS(String dataDir, String logDir, int memtableLimit) {
+    	this.logDir = Paths.get(logDir);
+    	
+    	if (!Files.exists(this.logDir)) {
+        	try {
+        		Files.createDirectories(this.logDir);
+        	} catch (IOException e) {
+        		e.printStackTrace();
+        	}
+        }
+    	
     	try {
     		// 出力ファイルを指定
-    		FileHandler fh = new FileHandler("test.log", true);
+    		FileHandler fh = new FileHandler(logDir +File.separator+ LOGFILE_NAME, true);
     		// フォーマット指定
     		fh.setFormatter(new SimpleFormatter());
     		// 何をしてる処理かわかっていない（ロガーにファイルを指定している？）
@@ -51,14 +66,7 @@ public class SimpleKVS {
     	this.logger.log(Level.INFO, String.format("Set \"%s\" as the data directory.", this.dataDir));
         
         // ディレクトリが存在しない場合、作成する
-        if (!Files.exists(this.dataDir)) {
-        	this.logger.log(Level.INFO, String.format("\"%s\" isn't exist, so create a directory.", this.dataDir));
-        	try {
-        		Files.createDirectories(this.dataDir);
-        	} catch (IOException e) {
-        		this.logger.log(Level.WARNING, "The following exception occurred in the process of creating directory.", e);
-        	}
-        }
+    	this.makeDir(this.dataDir);
         
         this.memtable = new TreeMap<String, String>();
         this.memtableLimit = memtableLimit;
@@ -84,12 +92,16 @@ public class SimpleKVS {
         this.logger.log(Level.INFO, "Finish to launch SimpleKVS");
     }
 
+    public SimpleKVS(String dataDir, String logDir) {
+    	this(dataDir, logDir, SimpleKVS.MEMTABLE_LIMIT_DEFAULT);
+    }
+    
     public SimpleKVS(String dataDir) {
-        this(dataDir, 1024);
+        this(dataDir, SimpleKVS.LOGDIR_DEFAULT, SimpleKVS.MEMTABLE_LIMIT_DEFAULT);
     }
 
     public SimpleKVS() {
-        this(".", 1024);
+        this(SimpleKVS.DATADIR_DEFAULT, SimpleKVS.LOGDIR_DEFAULT, SimpleKVS.MEMTABLE_LIMIT_DEFAULT);
     }
     
     public String get(String key) {
@@ -138,6 +150,17 @@ public class SimpleKVS {
      */ 
     private boolean isDeleted(String value) {
         return value.equals("__tombstone__");
+    }
+    
+    private void makeDir(Path dirPath) {
+    	if (!Files.exists(dirPath)) {
+        	this.logger.log(Level.INFO, String.format("\"%s\" isn't exist, so create a directory.", dirPath));
+        	try {
+        		Files.createDirectories(dirPath);
+        	} catch (IOException e) {
+        		this.logger.log(Level.WARNING, "The following exception occurred in the process of creating directory.", e);
+        	}
+        }
     }
     
     private void writeWAL(String key, String value) {
