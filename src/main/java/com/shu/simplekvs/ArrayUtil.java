@@ -10,7 +10,7 @@ public class ArrayUtil {
 		}
 		return array;
 	}
-	
+
     protected static byte[] combineByteArray(byte[] byteArray1, byte[] byteArray2) {
         // 各配列の長さを取得
         int length1 = byteArray1.length;
@@ -36,5 +36,4 @@ public class ArrayUtil {
         String[] sclicedArr = Arrays.copyOfRange(arr, stIndx, enIndx);
         return sclicedArr;
     }
-
 }

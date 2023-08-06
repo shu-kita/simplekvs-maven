@@ -1,3 +1,4 @@
+
 target/
 pom.xml.tag
 pom.xml.releaseBackup
@@ -16,3 +17,8 @@ buildNumber.properties
 # JDT-specific (Eclipse Java Development Tools)
 .classpath
 .settings/
+
+# データ・ログを保存するディレクトリをGitにアップロードしないため
+data/
+log/
+src/test/tmp

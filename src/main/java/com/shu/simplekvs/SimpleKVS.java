@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
+import java.util.logging.LogManager;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 
@@ -29,6 +30,9 @@ public class SimpleKVS {
     private static final String DATADIR_DEFAULT = "data";
     private static final List<String> METHODLIST = new ArrayList<>(Arrays.asList("put","get","delete")); 
     private Logger logger = Logger.getLogger("SampleLogging");
+    
+    protected static final int SUCESS = 0;
+    protected static final int FAILED = 1;
 
     private Path dataDir;
     private Path logDir;
@@ -49,11 +53,11 @@ public class SimpleKVS {
         }
     	
     	try {
+    		LogManager.getLogManager().reset();
     		// 出力ファイルを指定
     		FileHandler fh = new FileHandler(logDir +File.separator+ LOGFILE_NAME, true);
     		// フォーマット指定
     		fh.setFormatter(new SimpleFormatter());
-    		// 何をしてる処理かわかっていない（ロガーにファイルを指定している？）
     		this.logger.addHandler(fh);
     	} catch (IOException e) {
     		e.printStackTrace();
@@ -81,8 +85,8 @@ public class SimpleKVS {
         
         // WAL読込み処理
         this.logger.log(Level.INFO, String.format("Load WAL."));
-        this.wal = new WAL(dataDir);
         try {
+        	this.wal = new WAL(dataDir);
         	this.memtable = this.wal.recovery();
         } catch (IOException e) {
         	this.logger.log(Level.WARNING, "The following exception occurred in the process loading WAL.", e);
@@ -118,9 +122,8 @@ public class SimpleKVS {
 
     public void put(String key, String value) {
     	this.logger.log(Level.INFO, String.format("Operation is put. Key is \"%s\", Value is \"%s\"", key, value));
-
-    	this.writeWAL(key, value);
     	
+    	this.writeWAL(key, value);
     	this.memtable.put(key, value);
     	this.logger.log(Level.INFO, String.format("Key \"%s\" and Value \"%s\" are written to Memtable.", key, value));
 
@@ -151,6 +154,7 @@ public class SimpleKVS {
     private boolean isDeleted(String value) {
         return value.equals("__tombstone__");
     }
+    
     
     private void makeDir(Path dirPath) {
     	if (!Files.exists(dirPath)) {
@@ -244,7 +248,6 @@ public class SimpleKVS {
     	Map<String, String> mergedMemtable = new TreeMap<String, String>();
 
     	for (SSTable sstab : sstableList) {
-    		System.out.println(sstab.getPath());
     		for (String key : sstab.getKeySet()) {
     			try {
     				String value = sstab.get(key);
@@ -270,7 +273,7 @@ public class SimpleKVS {
     		}
     	}
     }
-    
+        
     private void run() {
     	try (ServerSocket server = new ServerSocket(SimpleKVS.PORT)) {
     		this.logger.log(Level.INFO, String.format("Listening for incoming connections on port %d.", SimpleKVS.PORT));
@@ -291,7 +294,6 @@ public class SimpleKVS {
     			}
     			
     			String execRes = this.execOperation(req);
-    			System.out.println("exec");
     			
     			writer.println(execRes);
     		}
@@ -399,8 +401,8 @@ public class SimpleKVS {
     		System.exit(1);
     	}
 
-    	String dataDir = args.length == 1 ? args[0] : "data"; // dataを保存するディレクトリ(デフォルトはdata)
-    	SimpleKVS kvs = new SimpleKVS(dataDir);
+    	//String dataDir = args.length == 1 ? args[0] : "data"; // dataを保存するディレクトリ(デフォルトはdata)
+    	SimpleKVS kvs = new SimpleKVS();
     	kvs.run();
     }
 }

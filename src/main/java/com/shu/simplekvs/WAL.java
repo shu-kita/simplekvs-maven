@@ -15,8 +15,12 @@ public class WAL {
     private static final String FILENAME = "wal.dat";
     private String path;
 
-    public WAL(String dataDir) {
+    public WAL(String dataDir) throws IOException{
         this.path = dataDir + File.separator + WAL.FILENAME;
+        File file = new File(this.path);
+        if (!file.exists()) {
+        	file.createNewFile();
+        }
     }
 
     protected void put(String key, String value) throws IOException{
