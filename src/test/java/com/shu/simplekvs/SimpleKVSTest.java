@@ -4,6 +4,8 @@ package com.shu.simplekvs;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.File;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
 import org.junit.jupiter.api.Test;
 
@@ -33,6 +35,59 @@ class SimpleKVSTest extends SimpleKVS {
 		}
 	}
 
+	@Test
+	void testPut() {
+		SimpleKVS kvs = initKVS();
+		try {
+			for (int i=0; i<MEMTABLE_LIMIT; i++) {
+				kvs.put(Integer.valueOf(i).toString(), String.format("value%d", i));
+			}
+		} catch (Exception e) {
+			fail(e.getMessage());
+		}
+	}
+	
+	@Test
+	void testDelete() {
+		SimpleKVS kvs = initKVS();
+		String key = "testKey";
+		String value = "testValue";
+		kvs.put(key, value);
+		try {
+			kvs.delete(key);
+		} catch (Exception e) {
+			fail(e.getMessage());
+		}
+	}
+	
+	@Test
+	void testIsDeleted() {
+		try {
+			SimpleKVS kvs = initKVS();
+			Method method = SimpleKVS.class.getDeclaredMethod("isDeleted", String.class);
+			method.setAccessible(true);
+			
+			String key = "key";
+			String value = "value";
+			
+			kvs.put(key, value);
+			
+			String valueForTest = kvs.get(key);
+			Boolean f = (Boolean)method.invoke(kvs, valueForTest);
+			
+			kvs.delete(key);
+			valueForTest = kvs.get(key);
+			valueForTest = valueForTest == null ? "__tombstone__" : valueForTest;
+			Boolean t = (Boolean)method.invoke(kvs, valueForTest);
+			
+			assertFalse(f);
+			assertTrue(t);
+			
+		} catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
+			fail(e.getMessage());
+		}
+	}
+	
 	private String generateRandomString(int length) {
 		String theAlphaNumericS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"; 
 		//create the StringBuffer
